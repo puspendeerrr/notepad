@@ -164,7 +164,7 @@ export function FloatingToolbar({
         {/* Pencil Tool */}
         <button
           type="button"
-          title="Pencil (Graphite texture)"
+          title="Pencil (Fine precision)"
           onClick={() => onSelectTool('pencil')}
           className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all ${
             currentTool === 'pencil'

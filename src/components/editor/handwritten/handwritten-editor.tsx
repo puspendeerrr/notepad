@@ -17,7 +17,7 @@ import {
   SaveStatus,
 } from '@/types';
 import { saveOfflineDraft } from '@/lib/storage/offline-drafts';
-import { DrawingCanvas } from './drawing-canvas';
+import { DrawingCanvas, renderSmoothStroke } from './drawing-canvas';
 import { FloatingToolbar } from './floating-toolbar';
 import { PagesPanel } from './pages-panel';
 import { ExportMenu } from './export-menu';
@@ -481,30 +481,7 @@ export function HandwrittenEditor({
 
     ctx.translate(-originX, -originY);
 
-    activePage.strokes.forEach((stroke) => {
-      if (!stroke.points || stroke.points.length === 0) return;
-      ctx.save();
-      ctx.globalAlpha = stroke.opacity || 1;
-      if (stroke.tool === 'highlighter') {
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = 0.4;
-      }
-      ctx.strokeStyle = stroke.color;
-      ctx.lineCap = stroke.tool === 'marker' ? 'square' : 'round';
-      ctx.lineJoin = 'round';
-
-      for (let i = 0; i < stroke.points.length - 1; i++) {
-        const p1 = stroke.points[i];
-        const p2 = stroke.points[i + 1];
-        const pressure = ((p1.pressure || 0.5) + (p2.pressure || 0.5)) / 2;
-        ctx.lineWidth = Math.max(1, stroke.size * (0.35 + pressure * 0.95));
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-      }
-      ctx.restore();
-    });
+    activePage.strokes.forEach((stroke) => renderSmoothStroke(ctx, stroke, isDark));
 
     activePage.shapes.forEach((s) => {
       ctx.save();

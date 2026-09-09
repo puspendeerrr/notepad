@@ -85,6 +85,101 @@ export function getInfiniteBackgroundStyle(
   };
 }
 
+// Render vector stroke smoothly with zero dotted or beaded artifacts
+export function renderSmoothStroke(
+  ctx: CanvasRenderingContext2D,
+  stroke: Stroke,
+  isDark = false
+) {
+  if (!stroke.points || stroke.points.length === 0) return;
+  ctx.save();
+
+  if (stroke.tool === 'highlighter') {
+    ctx.globalAlpha = stroke.opacity || 0.35;
+    ctx.globalCompositeOperation = isDark ? 'screen' : 'multiply';
+    ctx.strokeStyle = stroke.color;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  } else if (stroke.tool === 'pencil') {
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = stroke.color;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  } else if (stroke.tool === 'marker') {
+    ctx.globalAlpha = stroke.opacity || 0.85;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = stroke.color;
+    ctx.lineCap = 'square';
+    ctx.lineJoin = 'miter';
+  } else {
+    // Pen
+    ctx.globalAlpha = stroke.opacity || 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = stroke.color;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }
+
+  // 1. Filter out redundant jitter points (< 1.2px)
+  const raw = stroke.points;
+  const pts: typeof raw = [raw[0]];
+  for (let i = 1; i < raw.length; i++) {
+    const prev = pts[pts.length - 1];
+    const dx = raw[i].x - prev.x;
+    const dy = raw[i].y - prev.y;
+    if (dx * dx + dy * dy >= 1.44 || i === raw.length - 1) {
+      pts.push(raw[i]);
+    }
+  }
+
+  // Single point tap
+  if (pts.length === 1) {
+    const p = pts[0];
+    const r = Math.max(1, (stroke.size * (p.pressure || 0.5)) / 2);
+    ctx.fillStyle = stroke.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  // Two points
+  if (pts.length === 2) {
+    const p1 = pts[0];
+    const p2 = pts[1];
+    const press = ((p1.pressure || 0.5) + (p2.pressure || 0.5)) / 2;
+    ctx.lineWidth = Math.max(1, stroke.size * (0.4 + press * 0.85));
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  // Calculate weighted pressure
+  let totalPressure = 0;
+  for (let i = 0; i < pts.length; i++) {
+    totalPressure += pts[i].pressure || 0.5;
+  }
+  const avgPress = totalPressure / pts.length;
+
+  // Single continuous Bezier spline stroke with zero intermediate joints or dots
+  ctx.lineWidth = Math.max(1, stroke.size * (0.35 + avgPress * 0.95));
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const midX = (pts[i].x + pts[i + 1].x) / 2;
+    const midY = (pts[i].y + pts[i + 1].y) / 2;
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+  }
+  ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function DrawingCanvas({
   page,
   onChangePage,
@@ -187,67 +282,8 @@ export function DrawingCanvas({
       }
     });
 
-    // 4. Draw Vector Strokes in World Coordinates
-    const renderStroke = (stroke: Stroke) => {
-      if (!stroke.points || stroke.points.length === 0) return;
-      ctx.save();
-
-      if (stroke.tool === 'highlighter') {
-        ctx.globalAlpha = stroke.opacity || 0.38;
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.strokeStyle = stroke.color;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-      } else if (stroke.tool === 'pencil') {
-        ctx.globalAlpha = (stroke.opacity || 0.8) * 0.85;
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = stroke.color;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-      } else if (stroke.tool === 'marker') {
-        ctx.globalAlpha = stroke.opacity || 0.65;
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = stroke.color;
-        ctx.lineCap = 'square';
-        ctx.lineJoin = 'miter';
-      } else {
-        // Pen
-        ctx.globalAlpha = stroke.opacity || 1;
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = stroke.color;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-      }
-
-      if (stroke.points.length === 1) {
-        const p = stroke.points[0];
-        const radius = Math.max(1, (stroke.size * (p.pressure || 0.5)) / 2);
-        ctx.fillStyle = stroke.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        return;
-      }
-
-      // Smooth multi-segment variable-width rendering
-      for (let i = 0; i < stroke.points.length - 1; i++) {
-        const p1 = stroke.points[i];
-        const p2 = stroke.points[i + 1];
-        const pressure = ((p1.pressure || 0.5) + (p2.pressure || 0.5)) / 2;
-        const width = Math.max(1, stroke.size * (0.35 + pressure * 0.95));
-
-        ctx.lineWidth = width;
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    };
-
-    page.strokes.forEach((s) => renderStroke(s));
+    // 4. Draw Vector Strokes in World Coordinates (Smooth Bezier Splines - No Dotted Artifacts)
+    page.strokes.forEach((s) => renderSmoothStroke(ctx, s, isDark));
 
     // 5. Draw Shapes in World Coordinates
     const renderShape = (s: CanvasShape) => {
@@ -297,7 +333,7 @@ export function DrawingCanvas({
 
     // 6. In-progress Live Stroke
     if (currentStrokeRef.current) {
-      renderStroke(currentStrokeRef.current);
+      renderSmoothStroke(ctx, currentStrokeRef.current, isDark);
     }
 
     // 7. In-progress Live Shape Preview
@@ -359,7 +395,7 @@ export function DrawingCanvas({
     }
 
     ctx.restore();
-  }, [page, pan, zoom, selectedItemIds]);
+  }, [page, pan, zoom, selectedItemIds, isDark]);
 
   // Sync canvas dimensions to fill 100% of viewport and handle orientation changes
   useEffect(() => {
@@ -568,8 +604,8 @@ export function DrawingCanvas({
     // 8. Drawing Tools (Pen, Pencil, Marker, Highlighter)
     let toolOpacity = 1;
     if (currentTool === 'highlighter') toolOpacity = 0.38;
-    else if (currentTool === 'marker') toolOpacity = 0.65;
-    else if (currentTool === 'pencil') toolOpacity = 0.85;
+    else if (currentTool === 'marker') toolOpacity = 0.85;
+    else if (currentTool === 'pencil') toolOpacity = 1;
 
     const strokeSize = currentTool === 'highlighter' ? strokeWidth * 2.5 : strokeWidth;
 
@@ -662,6 +698,13 @@ export function DrawingCanvas({
       coalescedEvents.forEach((ev: PointerEvent | React.PointerEvent<HTMLCanvasElement>) => {
         const subPt = clientToWorld(ev.clientX, ev.clientY);
         const subPressure = ev.pressure > 0 ? ev.pressure : 0.5;
+
+        const pts = currentStrokeRef.current?.points;
+        if (pts && pts.length > 0) {
+          const last = pts[pts.length - 1];
+          const distSq = (subPt.x - last.x) ** 2 + (subPt.y - last.y) ** 2;
+          if (distSq < 1.0) return; // Skip sub-pixel noise to prevent clustering
+        }
 
         currentStrokeRef.current?.points.push({
           x: subPt.x,
