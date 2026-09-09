@@ -17,7 +17,7 @@ import {
   SaveStatus,
 } from '@/types';
 import { saveOfflineDraft } from '@/lib/storage/offline-drafts';
-import { DrawingCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT } from './drawing-canvas';
+import { DrawingCanvas } from './drawing-canvas';
 import { FloatingToolbar } from './floating-toolbar';
 import { PagesPanel } from './pages-panel';
 import { ExportMenu } from './export-menu';
@@ -282,10 +282,19 @@ export function HandwrittenEditor({
         const width = Math.min(maxWidth, img.width);
         const height = (width / img.width) * img.height;
 
+        const viewportCenterX =
+          typeof window !== 'undefined'
+            ? (-pan.x + window.innerWidth / 2) / zoom - width / 2
+            : 200;
+        const viewportCenterY =
+          typeof window !== 'undefined'
+            ? (-pan.y + window.innerHeight / 2) / zoom - height / 2
+            : 200;
+
         const newImage: CanvasImage = {
           id: `img-${Date.now()}`,
-          x: (VIRTUAL_WIDTH - width) / 2,
-          y: 200,
+          x: viewportCenterX,
+          y: viewportCenterY,
           width,
           height,
           src,
@@ -419,22 +428,59 @@ export function HandwrittenEditor({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleUndo, handleRedo, performSave, isFocusMode]);
 
-  // Export Current Page as PNG
+  // Export Viewport or All Content as PNG
   const handleExportPng = async () => {
-    const canvas = document.createElement('canvas');
-    const dpr = 2; // High resolution
-    canvas.width = VIRTUAL_WIDTH * dpr;
-    canvas.height = VIRTUAL_HEIGHT * dpr;
-    const ctx = canvas.getContext('2d');
+    const activePage = pages[currentPageIndex];
+    if (!activePage) return;
+
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+
+    activePage.strokes.forEach((s) => {
+      s.points.forEach((p) => {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      });
+    });
+
+    activePage.shapes.forEach((s) => {
+      minX = Math.min(minX, s.x, s.x + s.width);
+      minY = Math.min(minY, s.y, s.y + s.height);
+      maxX = Math.max(maxX, s.x, s.x + s.width);
+      maxY = Math.max(maxY, s.y, s.y + s.height);
+    });
+
+    activePage.textBoxes.forEach((tb) => {
+      minX = Math.min(minX, tb.x);
+      minY = Math.min(minY, tb.y);
+      maxX = Math.max(maxX, tb.x + (tb.width || 220));
+      maxY = Math.max(maxY, tb.y + (tb.height || 60));
+    });
+
+    const hasContent = minX !== Infinity && maxX !== -Infinity;
+    const padding = 60;
+    const originX = hasContent ? minX - padding : 0;
+    const originY = hasContent ? minY - padding : 0;
+    const width = hasContent ? Math.max(400, maxX - minX + padding * 2) : 1200;
+    const height = hasContent ? Math.max(400, maxY - minY + padding * 2) : 800;
+
+    const exportCanvas = document.createElement('canvas');
+    const dpr = 2;
+    exportCanvas.width = width * dpr;
+    exportCanvas.height = height * dpr;
+    const ctx = exportCanvas.getContext('2d');
     if (!ctx) return;
 
     ctx.scale(dpr, dpr);
+    ctx.fillStyle = isDark ? '#0b0c0e' : '#ffffff';
+    ctx.fillRect(0, 0, width, height);
 
-    const activePage = pages[currentPageIndex];
-    ctx.fillStyle = activePage.paperColor || '#ffffff';
-    ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+    ctx.translate(-originX, -originY);
 
-    // Draw strokes
     activePage.strokes.forEach((stroke) => {
       if (!stroke.points || stroke.points.length === 0) return;
       ctx.save();
@@ -451,7 +497,7 @@ export function HandwrittenEditor({
         const p1 = stroke.points[i];
         const p2 = stroke.points[i + 1];
         const pressure = ((p1.pressure || 0.5) + (p2.pressure || 0.5)) / 2;
-        ctx.lineWidth = Math.max(1, stroke.size * (0.4 + pressure * 0.9));
+        ctx.lineWidth = Math.max(1, stroke.size * (0.35 + pressure * 0.95));
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
@@ -460,13 +506,18 @@ export function HandwrittenEditor({
       ctx.restore();
     });
 
-    // Draw shapes
     activePage.shapes.forEach((s) => {
       ctx.save();
       ctx.strokeStyle = s.strokeColor;
       ctx.lineWidth = s.strokeWidth;
       if (s.type === 'rectangle') ctx.strokeRect(s.x, s.y, s.width, s.height);
-      else if (s.type === 'line') {
+      else if (s.type === 'circle') {
+        const rx = Math.abs(s.width) / 2;
+        const ry = Math.abs(s.height) / 2;
+        ctx.beginPath();
+        ctx.ellipse(s.x + s.width / 2, s.y + s.height / 2, Math.max(1, rx), Math.max(1, ry), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (s.type === 'line') {
         ctx.beginPath();
         ctx.moveTo(s.x, s.y);
         ctx.lineTo(s.x + s.width, s.y + s.height);
@@ -475,11 +526,18 @@ export function HandwrittenEditor({
       ctx.restore();
     });
 
-    // Trigger download
-    const url = canvas.toDataURL('image/png');
+    activePage.textBoxes.forEach((tb) => {
+      ctx.save();
+      ctx.fillStyle = tb.color;
+      ctx.font = `${tb.fontSize}px sans-serif`;
+      ctx.fillText(tb.text, tb.x, tb.y + tb.fontSize);
+      ctx.restore();
+    });
+
+    const url = exportCanvas.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${noteTitle.toLowerCase().replace(/\s+/g, '-')}-page-${currentPageIndex + 1}.png`;
+    a.download = `${noteTitle.toLowerCase().replace(/\s+/g, '-')}-canvas.png`;
     a.click();
   };
 
@@ -488,41 +546,21 @@ export function HandwrittenEditor({
     window.print();
   };
 
-  // Fit to Page zoom calculation
-  const handleFitToPage = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      const availHeight = window.innerHeight - 68;
-      const availWidth = window.innerWidth - 80;
-      const fitZoom = Math.max(
-        0.35,
-        Math.min(1.0, Math.min(availHeight / VIRTUAL_HEIGHT, availWidth / VIRTUAL_WIDTH))
-      );
-      setZoom(Number(fitZoom.toFixed(2)));
-      setPan({ x: 0, y: 0 });
-    } else {
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
-    }
-  }, []);
-
-  // Fit to page on initial load
-  const hasFittedInitialRef = useRef(false);
-  useEffect(() => {
-    if (!hasFittedInitialRef.current) {
-      hasFittedInitialRef.current = true;
-      handleFitToPage();
-    }
-  }, [handleFitToPage]);
+  // Reset View to origin & 100% zoom
+  const handleResetView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
 
   const activePage = pages[currentPageIndex] || pages[0];
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 select-none">
-      {/* Top Header Bar */}
+    <div className="relative h-screen w-screen overflow-hidden bg-zinc-100 dark:bg-[#0b0c0e] text-zinc-900 dark:text-zinc-100 select-none">
+      {/* Top Floating Header Overlay */}
       {!isFocusMode && (
-        <header className="h-13 shrink-0 flex items-center justify-between px-3 sm:px-6 border-b border-zinc-200/80 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md z-30">
-          {/* Left Controls: Back + Title */}
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="absolute top-3 inset-x-3 sm:inset-x-6 z-30 flex items-center justify-between pointer-events-none transition-all duration-300">
+          {/* Left: Back + Title */}
+          <div className="flex items-center gap-2 pointer-events-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-md min-w-0">
             <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
               <Link href="/notes" title="All Notes">
                 <ArrowLeft className="h-4 w-4" />
@@ -548,37 +586,39 @@ export function HandwrittenEditor({
             </div>
           </div>
 
-          {/* Center: Multi-Page Navigation */}
-          <PagesPanel
-            pages={pages}
-            currentPageIndex={currentPageIndex}
-            onSelectPage={setCurrentPageIndex}
-            onAddPage={handleAddPage}
-            onDuplicatePage={handleDuplicatePage}
-            onDeletePage={handleDeletePage}
-            onMovePage={handleMovePage}
-            onChangeTemplate={handleChangeTemplate}
-            onChangePaperColor={handleChangePaperColor}
-          />
+          {/* Center: Multi-Page / Board Navigation */}
+          <div className="pointer-events-auto">
+            <PagesPanel
+              pages={pages}
+              currentPageIndex={currentPageIndex}
+              onSelectPage={setCurrentPageIndex}
+              onAddPage={handleAddPage}
+              onDuplicatePage={handleDuplicatePage}
+              onDeletePage={handleDeletePage}
+              onMovePage={handleMovePage}
+              onChangeTemplate={handleChangeTemplate}
+              onChangePaperColor={handleChangePaperColor}
+            />
+          </div>
 
-          {/* Right Controls: Save Status, Zoom, Mode, Export, Theme */}
-          <div className="flex items-center gap-2">
-            {/* Zoom Controls */}
-            <div className="hidden md:flex items-center gap-1 px-1.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs">
+          {/* Right Controls: Save Status, Zoom/Reset, Mode, Export, Theme */}
+          <div className="flex items-center gap-2 pointer-events-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-md">
+            {/* Zoom Controls with Reset View */}
+            <div className="hidden md:flex items-center gap-1 px-1.5 py-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs">
               <button
                 type="button"
-                onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.15).toFixed(2))))}
+                onClick={() => setZoom((z) => Math.max(0.15, Number((z - 0.15).toFixed(2))))}
                 className="p-1 hover:text-zinc-900 dark:hover:text-zinc-100"
                 title="Zoom Out"
               >
                 <ZoomOut className="h-3.5 w-3.5" />
               </button>
-              <span className="w-10 text-center text-[11px] font-mono text-zinc-600 dark:text-zinc-400">
+              <span className="w-11 text-center text-[11px] font-mono text-zinc-600 dark:text-zinc-400">
                 {Math.round(zoom * 100)}%
               </span>
               <button
                 type="button"
-                onClick={() => setZoom((z) => Math.min(3.0, Number((z + 0.15).toFixed(2))))}
+                onClick={() => setZoom((z) => Math.min(4.0, Number((z + 0.15).toFixed(2))))}
                 className="p-1 hover:text-zinc-900 dark:hover:text-zinc-100"
                 title="Zoom In"
               >
@@ -586,11 +626,12 @@ export function HandwrittenEditor({
               </button>
               <button
                 type="button"
-                onClick={handleFitToPage}
-                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border-l border-zinc-200 dark:border-zinc-800 ml-1 pl-1.5"
-                title="Reset Zoom (100%)"
+                onClick={handleResetView}
+                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border-l border-zinc-200 dark:border-zinc-800 ml-1 pl-1.5 flex items-center gap-1"
+                title="Reset View (100%)"
               >
                 <RotateCcw className="h-3 w-3" />
+                <span className="hidden lg:inline text-[10px]">Reset</span>
               </button>
             </div>
 
@@ -647,8 +688,8 @@ export function HandwrittenEditor({
         </header>
       )}
 
-      {/* Main Canvas Workspace */}
-      <main className="relative flex-1 w-full h-full overflow-hidden">
+      {/* Full-Viewport Infinite Drawing Canvas */}
+      <main className="absolute inset-0 w-full h-full overflow-hidden">
         {/* Floating iPad Toolbar */}
         <FloatingToolbar
           currentTool={currentTool}

@@ -10,8 +10,8 @@ import {
   Stroke,
   CanvasShape,
   CanvasTextBox,
+  PaperTemplate,
 } from '@/types';
-import { PaperBackground } from './paper-background';
 
 interface DrawingCanvasProps {
   page: NotebookPage;
@@ -28,14 +28,61 @@ interface DrawingCanvasProps {
   isDark?: boolean;
 }
 
-// Standard Notebook Page Virtual Resolution (A4 / iPad Pro aspect ratio)
-export const VIRTUAL_WIDTH = 1000;
-export const VIRTUAL_HEIGHT = 1414;
-
 let canvasElementCounter = 0;
 function getCanvasId(prefix: string): string {
   canvasElementCounter += 1;
   return `${prefix}-${canvasElementCounter}`;
+}
+
+// Compute infinite CSS background style based on template, pan, zoom, and theme
+export function getInfiniteBackgroundStyle(
+  template: PaperTemplate = 'dotgrid',
+  isDark: boolean = false,
+  pan: { x: number; y: number } = { x: 0, y: 0 },
+  zoom: number = 1
+): React.CSSProperties {
+  const baseBg = isDark ? '#0b0c0e' : '#fafafa';
+  const gridSize = Math.max(12, 28 * zoom);
+  const offsetX = ((pan.x % gridSize) + gridSize) % gridSize;
+  const offsetY = ((pan.y % gridSize) + gridSize) % gridSize;
+
+  if (template === 'dotgrid') {
+    const dotColor = isDark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.18)';
+    const dotRadius = Math.max(0.8, Math.min(1.8, 1.2 * zoom));
+    return {
+      backgroundColor: baseBg,
+      backgroundImage: `radial-gradient(circle, ${dotColor} ${dotRadius}px, transparent ${dotRadius}px)`,
+      backgroundSize: `${gridSize}px ${gridSize}px`,
+      backgroundPosition: `${offsetX}px ${offsetY}px`,
+    };
+  }
+
+  if (template === 'grid') {
+    const lineColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.06)';
+    return {
+      backgroundColor: baseBg,
+      backgroundImage: `linear-gradient(to right, ${lineColor} 1px, transparent 1px), linear-gradient(to bottom, ${lineColor} 1px, transparent 1px)`,
+      backgroundSize: `${gridSize}px ${gridSize}px`,
+      backgroundPosition: `${offsetX}px ${offsetY}px`,
+    };
+  }
+
+  if (template === 'ruled') {
+    const lineColor = isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.08)';
+    const ruledSize = Math.max(16, 34 * zoom);
+    const ruledOffsetY = ((pan.y % ruledSize) + ruledSize) % ruledSize;
+    return {
+      backgroundColor: baseBg,
+      backgroundImage: `linear-gradient(to bottom, ${lineColor} 1px, transparent 1px)`,
+      backgroundSize: `100% ${ruledSize}px`,
+      backgroundPosition: `0px ${ruledOffsetY}px`,
+    };
+  }
+
+  // Blank
+  return {
+    backgroundColor: baseBg,
+  };
 }
 
 export function DrawingCanvas({
@@ -62,6 +109,9 @@ export function DrawingCanvas({
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [activeTextBoxId, setActiveTextBoxId] = useState<string | null>(null);
 
+  // Spacebar pan tracking (Figma / Miro style)
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+
   // Multi-touch tracking for pinch-zoom and palm rejection
   const activePointersRef = useRef<Map<number, { x: number; y: number; type: string }>>(new Map());
   const pinchStartDistanceRef = useRef<number | null>(null);
@@ -69,22 +119,44 @@ export function DrawingCanvas({
   const pinchStartPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Convert client viewport coordinates to canvas virtual coordinates (100% exact 1:1 mapping)
-  const clientToCanvas = useCallback(
+  // Track space key for click-to-pan
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement as HTMLElement)?.tagName;
+      if (e.code === 'Space' && activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+        setIsSpacePressed(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Convert client viewport screen coordinates to canvas world coordinates
+  const clientToWorld = useCallback(
     (clientX: number, clientY: number): { x: number; y: number } => {
       const canvas = canvasRef.current;
       if (!canvas) return { x: 0, y: 0 };
       const rect = canvas.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
+      const screenX = clientX - rect.left;
+      const screenY = clientY - rect.top;
       return {
-        x: ((clientX - rect.left) / rect.width) * VIRTUAL_WIDTH,
-        y: ((clientY - rect.top) / rect.height) * VIRTUAL_HEIGHT,
+        x: (screenX - pan.x) / zoom,
+        y: (screenY - pan.y) / zoom,
       };
     },
-    []
+    [pan, zoom]
   );
 
-  // Full Redraw of Canvas
+  // Full Redraw of Canvas in World Coordinates
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -95,10 +167,14 @@ export function DrawingCanvas({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    // Device pixel ratio scaling for crisp retina rendering
+    // 1. Device pixel ratio scaling for crisp retina rendering
     ctx.scale(dpr, dpr);
 
-    // 1. Draw Images
+    // 2. Camera View Transform (Pan & Zoom)
+    ctx.translate(pan.x, pan.y);
+    ctx.scale(zoom, zoom);
+
+    // 3. Draw Images in World Coordinates
     page.images.forEach((imgItem) => {
       const img = new Image();
       img.src = imgItem.src;
@@ -111,7 +187,7 @@ export function DrawingCanvas({
       }
     });
 
-    // 2. Draw Vector Strokes
+    // 4. Draw Vector Strokes in World Coordinates
     const renderStroke = (stroke: Stroke) => {
       if (!stroke.points || stroke.points.length === 0) return;
       ctx.save();
@@ -154,125 +230,87 @@ export function DrawingCanvas({
         return;
       }
 
-      // Smooth Catmull-Rom or Quadratic Midpoint Bezier Curves
+      // Smooth multi-segment variable-width rendering
       for (let i = 0; i < stroke.points.length - 1; i++) {
         const p1 = stroke.points[i];
         const p2 = stroke.points[i + 1];
+        const pressure = ((p1.pressure || 0.5) + (p2.pressure || 0.5)) / 2;
+        const width = Math.max(1, stroke.size * (0.35 + pressure * 0.95));
 
-        // Dynamic line width from Apple Pencil pressure
-        const pressure1 = p1.pressure !== undefined && p1.pressure > 0 ? p1.pressure : 0.5;
-        const pressure2 = p2.pressure !== undefined && p2.pressure > 0 ? p2.pressure : 0.5;
-        const avgPressure = (pressure1 + pressure2) / 2;
-        const currentWidth = Math.max(1, stroke.size * (0.4 + avgPressure * 0.9));
-
-        ctx.lineWidth = currentWidth;
+        ctx.lineWidth = width;
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
-
-        if (i < stroke.points.length - 2) {
-          const p3 = stroke.points[i + 2];
-          const midX = (p2.x + p3.x) / 2;
-          const midY = (p2.y + p3.y) / 2;
-          ctx.quadraticCurveTo(p2.x, p2.y, midX, midY);
-        } else {
-          ctx.lineTo(p2.x, p2.y);
-        }
+        ctx.lineTo(p2.x, p2.y);
         ctx.stroke();
       }
 
       ctx.restore();
     };
 
-    page.strokes.forEach(renderStroke);
+    page.strokes.forEach((s) => renderStroke(s));
 
-    // Active live stroke preview
+    // 5. Draw Shapes in World Coordinates
+    const renderShape = (s: CanvasShape) => {
+      ctx.save();
+      ctx.strokeStyle = s.strokeColor;
+      ctx.lineWidth = s.strokeWidth;
+      ctx.globalAlpha = s.opacity || 1;
+
+      if (s.type === 'rectangle') {
+        ctx.strokeRect(s.x, s.y, s.width, s.height);
+      } else if (s.type === 'circle') {
+        const rx = Math.abs(s.width) / 2;
+        const ry = Math.abs(s.height) / 2;
+        const cx = s.x + s.width / 2;
+        const cy = s.y + s.height / 2;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, Math.max(1, rx), Math.max(1, ry), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (s.type === 'line') {
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y);
+        ctx.lineTo(s.x + s.width, s.y + s.height);
+        ctx.stroke();
+      } else if (s.type === 'arrow') {
+        const toX = s.x + s.width;
+        const toY = s.y + s.height;
+        const angle = Math.atan2(s.height, s.width);
+        const headlen = 16;
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y);
+        ctx.lineTo(toX, toY);
+        ctx.lineTo(
+          toX - headlen * Math.cos(angle - Math.PI / 6),
+          toY - headlen * Math.sin(angle - Math.PI / 6)
+        );
+        ctx.moveTo(toX, toY);
+        ctx.lineTo(
+          toX - headlen * Math.cos(angle + Math.PI / 6),
+          toY - headlen * Math.sin(angle + Math.PI / 6)
+        );
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+
+    page.shapes.forEach((s) => renderShape(s));
+
+    // 6. In-progress Live Stroke
     if (currentStrokeRef.current) {
       renderStroke(currentStrokeRef.current);
     }
 
-    // 3. Draw Shapes
-    const renderShape = (shape: CanvasShape) => {
-      ctx.save();
-      ctx.globalAlpha = shape.opacity || 1;
-      ctx.strokeStyle = shape.strokeColor;
-      ctx.lineWidth = shape.strokeWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      if (shape.fillColor) {
-        ctx.fillStyle = shape.fillColor;
-      }
-
-      if (shape.type === 'line') {
-        ctx.beginPath();
-        ctx.moveTo(shape.x, shape.y);
-        ctx.lineTo(shape.x + shape.width, shape.y + shape.height);
-        ctx.stroke();
-      } else if (shape.type === 'arrow') {
-        const fromX = shape.x;
-        const fromY = shape.y;
-        const toX = shape.x + shape.width;
-        const toY = shape.y + shape.height;
-        const headLen = Math.max(12, shape.strokeWidth * 3);
-        const angle = Math.atan2(toY - fromY, toX - fromX);
-
-        ctx.beginPath();
-        ctx.moveTo(fromX, fromY);
-        ctx.lineTo(toX, toY);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(toX, toY);
-        ctx.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
-        ctx.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
-        ctx.closePath();
-        ctx.fillStyle = shape.strokeColor;
-        ctx.fill();
-      } else if (shape.type === 'rectangle') {
-        ctx.beginPath();
-        ctx.rect(shape.x, shape.y, shape.width, shape.height);
-        if (shape.fillColor) ctx.fill();
-        ctx.stroke();
-      } else if (shape.type === 'circle') {
-        const radiusX = Math.abs(shape.width / 2);
-        const radiusY = Math.abs(shape.height / 2);
-        const centerX = shape.x + shape.width / 2;
-        const centerY = shape.y + shape.height / 2;
-
-        ctx.beginPath();
-        ctx.ellipse(centerX, centerY, Math.max(1, radiusX), Math.max(1, radiusY), 0, 0, Math.PI * 2);
-        if (shape.fillColor) ctx.fill();
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    };
-
-    page.shapes.forEach(renderShape);
-
-    // Active live shape preview
+    // 7. In-progress Live Shape Preview
     if (currentShapePreviewRef.current) {
       renderShape(currentShapePreviewRef.current);
     }
 
-    // 4. Draw Text Boxes
-    page.textBoxes.forEach((tb) => {
-      ctx.save();
-      ctx.font = `${tb.fontSize || 16}px ${tb.fontFamily || 'sans-serif'}`;
-      ctx.fillStyle = tb.color || '#09090b';
-      const lines = tb.text.split('\n');
-      lines.forEach((line, lineIdx) => {
-        ctx.fillText(line, tb.x, tb.y + (lineIdx + 1) * (tb.fontSize * 1.25));
-      });
-      ctx.restore();
-    });
-
-    // 5. Draw Lasso Path Preview
+    // 8. In-progress Lasso Selection Path
     if (lassoPointsRef.current.length > 1) {
       ctx.save();
-      ctx.strokeStyle = '#4f46e5';
+      ctx.strokeStyle = '#3b82f6';
       ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 4]);
+      ctx.setLineDash([5, 5]);
       ctx.beginPath();
       ctx.moveTo(lassoPointsRef.current[0].x, lassoPointsRef.current[0].y);
       for (let i = 1; i < lassoPointsRef.current.length; i++) {
@@ -282,35 +320,36 @@ export function DrawingCanvas({
       ctx.restore();
     }
 
-    // 6. Draw Selected Items Bounding Outline
+    // 9. Selected Items Bounding Box
     if (selectedItemIds.length > 0) {
-      const selectedStrokes = page.strokes.filter((s) => selectedItemIds.includes(s.id));
-      const selectedShapes = page.shapes.filter((s) => selectedItemIds.includes(s.id));
-
       let minX = Infinity;
       let minY = Infinity;
       let maxX = -Infinity;
       let maxY = -Infinity;
 
-      selectedStrokes.forEach((s) => {
-        s.points.forEach((p) => {
-          if (p.x < minX) minX = p.x;
-          if (p.y < minY) minY = p.y;
-          if (p.x > maxX) maxX = p.x;
-          if (p.y > maxY) maxY = p.y;
+      page.strokes
+        .filter((s) => selectedItemIds.includes(s.id))
+        .forEach((s) => {
+          s.points.forEach((p) => {
+            minX = Math.min(minX, p.x);
+            minY = Math.min(minY, p.y);
+            maxX = Math.max(maxX, p.x);
+            maxY = Math.max(maxY, p.y);
+          });
         });
-      });
 
-      selectedShapes.forEach((s) => {
-        if (s.x < minX) minX = s.x;
-        if (s.y < minY) minY = s.y;
-        if (s.x + s.width > maxX) maxX = s.x + s.width;
-        if (s.y + s.height > maxY) maxY = s.y + s.height;
-      });
+      page.shapes
+        .filter((s) => selectedItemIds.includes(s.id))
+        .forEach((s) => {
+          minX = Math.min(minX, s.x, s.x + s.width);
+          minY = Math.min(minY, s.y, s.y + s.height);
+          maxX = Math.max(maxX, s.x, s.x + s.width);
+          maxY = Math.max(maxY, s.y, s.y + s.height);
+        });
 
       if (minX !== Infinity) {
         ctx.save();
-        ctx.strokeStyle = '#6366f1';
+        ctx.strokeStyle = '#3b82f6';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 3]);
         const pad = 8;
@@ -320,28 +359,105 @@ export function DrawingCanvas({
     }
 
     ctx.restore();
-  }, [page, selectedItemIds]);
+  }, [page, pan, zoom, selectedItemIds]);
 
-  // Sync canvas dimensions with device pixel ratio
+  // Sync canvas dimensions to fill 100% of viewport
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const handleResize = () => {
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
 
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    canvas.width = VIRTUAL_WIDTH * dpr;
-    canvas.height = VIRTUAL_HEIGHT * dpr;
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
 
+      if (w > 0 && h > 0) {
+        if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+          canvas.width = w * dpr;
+          canvas.height = h * dpr;
+        }
+      }
+      redrawCanvas();
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [redrawCanvas]);
+
+  // Trigger redraw on state change
+  useEffect(() => {
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // Trigger redraw when dependencies update
-  useEffect(() => {
-    redrawCanvas();
-  }, [redrawCanvas]);
+  // Trackpad pinch-to-zoom & mouse wheel pan
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
 
-  // Pointer Down (Draw / Pan / Lasso / Eraser)
+    if (e.ctrlKey || e.metaKey) {
+      // Zoom centered at cursor position
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+      const nextZoom = Math.max(0.15, Math.min(4.0, Number((zoom * zoomFactor).toFixed(3))));
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const newPanX = mouseX - (mouseX - pan.x) * (nextZoom / zoom);
+        const newPanY = mouseY - (mouseY - pan.y) * (nextZoom / zoom);
+        onUpdateTransform(nextZoom, { x: newPanX, y: newPanY });
+      }
+    } else {
+      // Two-finger trackpad scroll or mouse wheel pan
+      onUpdateTransform(zoom, {
+        x: pan.x - e.deltaX,
+        y: pan.y - e.deltaY,
+      });
+    }
+  };
+
+  // Erase items around world point
+  const eraseAtPoint = (pt: { x: number; y: number }) => {
+    const threshold = (strokeWidth * 6) / zoom;
+
+    if (eraserMode === 'stroke') {
+      const filteredStrokes = page.strokes.filter((s) => {
+        return !s.points.some((p) => Math.hypot(p.x - pt.x, p.y - pt.y) < threshold);
+      });
+
+      const filteredShapes = page.shapes.filter((s) => {
+        const cx = s.x + s.width / 2;
+        const cy = s.y + s.height / 2;
+        return Math.hypot(cx - pt.x, cy - pt.y) > Math.max(s.width, s.height) / 2 + threshold;
+      });
+
+      if (filteredStrokes.length !== page.strokes.length || filteredShapes.length !== page.shapes.length) {
+        onChangePage({
+          ...page,
+          strokes: filteredStrokes,
+          shapes: filteredShapes,
+        });
+      }
+    } else {
+      const nextStrokes: Stroke[] = [];
+      page.strokes.forEach((s) => {
+        const remainingPoints = s.points.filter(
+          (p) => Math.hypot(p.x - pt.x, p.y - pt.y) >= threshold
+        );
+        if (remainingPoints.length > 1) {
+          nextStrokes.push({ ...s, points: remainingPoints });
+        }
+      });
+      onChangePage({
+        ...page,
+        strokes: nextStrokes,
+      });
+    }
+  };
+
+  // Pointer Down
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    // Prevent default touch gestures (scrolling, zooming)
     e.preventDefault();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
@@ -363,35 +479,33 @@ export function DrawingCanvas({
       return;
     }
 
-    // 2. Palm Rejection:
-    // If user is drawing with Apple Pencil (pen), reject touches
+    // 2. Palm Rejection: If Apple Pencil is active, reject touch drawing
     const hasPenActive = Array.from(activePointersRef.current.values()).some((p) => p.type === 'pen');
     if (hasPenActive && e.pointerType === 'touch') {
       return;
     }
 
-    // If finger drawing is disabled and input is touch, treat as pan
-    if (!allowFingerDrawing && e.pointerType === 'touch' && currentTool !== 'hand') {
+    // 3. Pan gestures (Space key, Hand tool, or Finger when finger drawing disabled)
+    const isPanning =
+      isSpacePressed ||
+      currentTool === 'hand' ||
+      (!allowFingerDrawing && e.pointerType === 'touch');
+
+    if (isPanning) {
       panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
       return;
     }
 
-    // 3. Hand / Pan tool
-    if (currentTool === 'hand') {
-      panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-      return;
-    }
+    const pt = clientToWorld(e.clientX, e.clientY);
+    const rawPressure = e.pressure > 0 ? e.pressure : 0.5;
 
-    const pt = clientToCanvas(e.clientX, e.clientY);
-    const rawPressure = e.pressure > 0 ? e.pressure : e.pointerType === 'pen' ? 0.5 : 0.5;
-
-    // 4. Text Tool: Click to place text box
+    // 4. Text Tool: Click to place text box at world point
     if (currentTool === 'text') {
       const newBox: CanvasTextBox = {
         id: getCanvasId('text'),
         x: pt.x,
         y: pt.y,
-        width: 200,
+        width: 220,
         height: 60,
         text: 'Type text here…',
         fontSize: 18,
@@ -465,56 +579,7 @@ export function DrawingCanvas({
     redrawCanvas();
   };
 
-  // Erase stroke or object intersecting point
-  const eraseAtPoint = (pt: { x: number; y: number }) => {
-    const threshold = strokeWidth * 2.5;
-
-    if (eraserMode === 'stroke') {
-      // Whole-stroke eraser: remove entire stroke if clicked anywhere near it
-      const filteredStrokes = page.strokes.filter((s) => {
-        return !s.points.some(
-          (p) => Math.hypot(p.x - pt.x, p.y - pt.y) < threshold
-        );
-      });
-
-      const filteredShapes = page.shapes.filter((s) => {
-        return !(
-          pt.x >= s.x - threshold &&
-          pt.x <= s.x + s.width + threshold &&
-          pt.y >= s.y - threshold &&
-          pt.y <= s.y + s.height + threshold
-        );
-      });
-
-      if (
-        filteredStrokes.length !== page.strokes.length ||
-        filteredShapes.length !== page.shapes.length
-      ) {
-        onChangePage({
-          ...page,
-          strokes: filteredStrokes,
-          shapes: filteredShapes,
-        });
-      }
-    } else {
-      // Partial eraser: filter points along stroke
-      const nextStrokes: Stroke[] = [];
-      page.strokes.forEach((s) => {
-        const remainingPoints = s.points.filter(
-          (p) => Math.hypot(p.x - pt.x, p.y - pt.y) >= threshold
-        );
-        if (remainingPoints.length > 1) {
-          nextStrokes.push({ ...s, points: remainingPoints });
-        }
-      });
-      onChangePage({
-        ...page,
-        strokes: nextStrokes,
-      });
-    }
-  };
-
-  // Pointer Move (Coalesced high-frequency Apple Pencil drawing & gestures)
+  // Pointer Move
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!activePointersRef.current.has(e.pointerId)) return;
 
@@ -529,7 +594,7 @@ export function DrawingCanvas({
       const pts = Array.from(activePointersRef.current.values());
       const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       const scaleDelta = currentDist / pinchStartDistanceRef.current;
-      const nextZoom = Math.max(0.5, Math.min(3.5, pinchStartZoomRef.current * scaleDelta));
+      const nextZoom = Math.max(0.15, Math.min(4.0, Number((pinchStartZoomRef.current * scaleDelta).toFixed(3))));
 
       const midX = (pts[0].x + pts[1].x) / 2;
       const midY = (pts[0].y + pts[1].y) / 2;
@@ -540,7 +605,7 @@ export function DrawingCanvas({
       return;
     }
 
-    // 2. Hand / Pan drag
+    // 2. Pan Drag
     if (panStartRef.current) {
       onUpdateTransform(zoom, {
         x: e.clientX - panStartRef.current.x,
@@ -549,7 +614,7 @@ export function DrawingCanvas({
       return;
     }
 
-    const pt = clientToCanvas(e.clientX, e.clientY);
+    const pt = clientToWorld(e.clientX, e.clientY);
 
     // 3. Eraser continuous drag
     if (currentTool === 'eraser') {
@@ -574,14 +639,14 @@ export function DrawingCanvas({
     }
 
     // 6. Apple Pencil / Pen Vector Drawing
-    // Process sub-frame coalesced events if available for 120Hz/240Hz ProMotion smoothness
+    // Process sub-frame coalesced events for 120Hz/240Hz ProMotion smoothness
     if (currentStrokeRef.current) {
       const nativeEv = e.nativeEvent as unknown as { getCoalescedEvents?: () => PointerEvent[] };
       const coalescedEvents =
         typeof nativeEv.getCoalescedEvents === 'function' ? nativeEv.getCoalescedEvents() : [e];
 
       coalescedEvents.forEach((ev: PointerEvent | React.PointerEvent<HTMLCanvasElement>) => {
-        const subPt = clientToCanvas(ev.clientX, ev.clientY);
+        const subPt = clientToWorld(ev.clientX, ev.clientY);
         const subPressure = ev.pressure > 0 ? ev.pressure : 0.5;
 
         currentStrokeRef.current?.points.push({
@@ -600,58 +665,58 @@ export function DrawingCanvas({
   // Pointer Up / Cancel
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     activePointersRef.current.delete(e.pointerId);
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
 
-    if (activePointersRef.current.size === 0) {
+    if (activePointersRef.current.size < 2) {
       pinchStartDistanceRef.current = null;
+    }
+
+    if (panStartRef.current) {
       panStartRef.current = null;
     }
 
-    // 1. Finalize Drawing Stroke
+    // Save completed stroke
     if (currentStrokeRef.current) {
-      const finalStroke = currentStrokeRef.current;
+      const stroke = currentStrokeRef.current;
       currentStrokeRef.current = null;
-
-      if (finalStroke.points.length > 0) {
+      if (stroke.points.length > 0) {
         onChangePage({
           ...page,
-          strokes: [...page.strokes, finalStroke],
+          strokes: [...page.strokes, stroke],
         });
       }
       redrawCanvas();
       return;
     }
 
-    // 2. Finalize Shape
+    // Save completed shape
     if (currentShapePreviewRef.current) {
-      const finalShape = currentShapePreviewRef.current;
+      const shape = currentShapePreviewRef.current;
       currentShapePreviewRef.current = null;
-
-      if (Math.abs(finalShape.width) > 4 || Math.abs(finalShape.height) > 4) {
+      if (Math.abs(shape.width) > 4 || Math.abs(shape.height) > 4) {
         onChangePage({
           ...page,
-          shapes: [...page.shapes, finalShape],
+          shapes: [...page.shapes, shape],
         });
       }
       redrawCanvas();
       return;
     }
 
-    // 3. Finalize Lasso Selection
+    // Complete Lasso Selection
     if (currentTool === 'lasso' && lassoPointsRef.current.length > 2) {
-      const lasso = lassoPointsRef.current;
+      const pts = lassoPointsRef.current;
       lassoPointsRef.current = [];
 
-      // Find strokes within lasso polygon bounding box
       let minX = Infinity;
       let minY = Infinity;
       let maxX = -Infinity;
       let maxY = -Infinity;
-      lasso.forEach((p) => {
-        if (p.x < minX) minX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y > maxY) maxY = p.y;
+
+      pts.forEach((p) => {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
       });
 
       const selectedIds: string[] = [];
@@ -673,79 +738,65 @@ export function DrawingCanvas({
     }
   };
 
+  const bgStyle = getInfiniteBackgroundStyle(page.template || 'dotgrid', isDark, pan, zoom);
+
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden flex items-center justify-center select-none touch-none cursor-crosshair bg-zinc-100 dark:bg-[#0b0c0e]"
-      style={{ touchAction: 'none' }}
+      onWheel={handleWheel}
+      className={`relative w-full h-full overflow-hidden select-none touch-none ${
+        isSpacePressed || currentTool === 'hand' ? 'cursor-grab' : 'cursor-crosshair'
+      }`}
+      style={{
+        touchAction: 'none',
+        ...bgStyle,
+      }}
     >
-      {/* Paper Page Surface */}
-      <div
-        className="relative rounded-lg border border-zinc-200/80 dark:border-zinc-800/80 shadow-2xl transition-transform"
-        style={{
-          width: `${VIRTUAL_WIDTH}px`,
-          height: `${VIRTUAL_HEIGHT}px`,
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transformOrigin: 'center center',
-        }}
-      >
-        {/* Notebook Template Background */}
-        <PaperBackground
-          width={VIRTUAL_WIDTH}
-          height={VIRTUAL_HEIGHT}
-          template={page.template || (isDark ? 'dark' : 'ruled')}
-          paperColor={page.paperColor}
-          isDark={isDark}
-        />
+      {/* Full-Screen Infinite Drawing Canvas */}
+      <canvas
+        ref={canvasRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        className="absolute inset-0 w-full h-full touch-none"
+        style={{ touchAction: 'none' }}
+      />
 
-        {/* High-Performance Canvas */}
-        <canvas
-          ref={canvasRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          className="absolute inset-0 w-full h-full touch-none"
+      {/* Floating World Text Boxes Overlay */}
+      {page.textBoxes.map((tb) => (
+        <div
+          key={tb.id}
           style={{
-            width: `${VIRTUAL_WIDTH}px`,
-            height: `${VIRTUAL_HEIGHT}px`,
-            touchAction: 'none',
+            position: 'absolute',
+            left: `${tb.x * zoom + pan.x}px`,
+            top: `${tb.y * zoom + pan.y}px`,
+            transform: `scale(${zoom})`,
+            transformOrigin: '0 0',
+            color: tb.color,
+            fontSize: `${tb.fontSize}px`,
+            fontFamily: tb.fontFamily,
           }}
-        />
-
-        {/* Text Boxes Overlay */}
-        {page.textBoxes.map((tb) => (
-          <div
-            key={tb.id}
-            style={{
-              position: 'absolute',
-              left: tb.x,
-              top: tb.y,
-              color: tb.color,
-              fontSize: `${tb.fontSize}px`,
-              fontFamily: tb.fontFamily,
+          className={`p-1 border border-dashed rounded cursor-text z-20 ${
+            activeTextBoxId === tb.id
+              ? 'border-indigo-500 bg-white/80 dark:bg-zinc-900/80 shadow-sm'
+              : 'border-transparent hover:border-zinc-400'
+          }`}
+          onClick={() => setActiveTextBoxId(tb.id)}
+        >
+          <input
+            type="text"
+            defaultValue={tb.text}
+            onBlur={(e) => {
+              const nextBoxes = page.textBoxes.map((b) =>
+                b.id === tb.id ? { ...b, text: e.target.value } : b
+              );
+              onChangePage({ ...page, textBoxes: nextBoxes });
             }}
-            className={`p-1 border border-dashed rounded cursor-text ${
-              activeTextBoxId === tb.id
-                ? 'border-indigo-500'
-                : 'border-transparent hover:border-zinc-400'
-            }`}
-            onClick={() => setActiveTextBoxId(tb.id)}
-          >
-            <input
-              type="text"
-              defaultValue={tb.text}
-              onBlur={(e) => {
-                const nextBoxes = page.textBoxes.map((b) =>
-                  b.id === tb.id ? { ...b, text: e.target.value } : b
-                );
-                onChangePage({ ...page, textBoxes: nextBoxes });
-              }}
-              className="bg-transparent border-0 outline-none p-0 w-full font-inherit text-inherit"
-            />
-          </div>
-        ))}
-      </div>
+            className="bg-transparent border-0 outline-none p-0 font-inherit text-inherit min-w-[120px]"
+          />
+        </div>
+      ))}
     </div>
   );
 }
