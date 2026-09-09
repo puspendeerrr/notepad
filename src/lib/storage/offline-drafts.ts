@@ -9,7 +9,8 @@ export async function saveOfflineDraft(
   userId: string,
   noteId: string,
   title: string,
-  content: string
+  content: string,
+  noteType?: 'text' | 'handwritten'
 ): Promise<void> {
   if (typeof window === 'undefined') return;
 
@@ -19,6 +20,7 @@ export async function saveOfflineDraft(
       userId,
       title,
       content,
+      note_type: noteType,
       updatedAt: Date.now(),
       synced: false,
     };

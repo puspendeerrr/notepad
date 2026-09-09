@@ -2,9 +2,11 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { TiptapEditor } from '@/components/editor/tiptap-editor';
+import { HandwrittenEditor } from '@/components/editor/handwritten/handwritten-editor';
 import { titleToSlug } from '@/lib/slug';
 import { Button } from '@/components/ui/button';
 import { FileQuestion, Plus, ArrowLeft } from 'lucide-react';
+import { NoteType } from '@/types';
 
 interface NotePageProps {
   params: Promise<{ slug: string }>;
@@ -15,6 +17,7 @@ interface NoteItem {
   user_id: string;
   title: string;
   slug: string;
+  note_type?: NoteType;
   content: string;
   created_at: string;
   updated_at: string;
@@ -128,6 +131,23 @@ export default async function NotePage({ params }: NotePageProps) {
     .select('*')
     .eq('user_id', user.id)
     .maybeSingle();
+
+  const isHandwritten =
+    note.note_type === 'handwritten' ||
+    (typeof note.content === 'string' &&
+      note.content.trim().startsWith('{') &&
+      note.content.includes('"pages"'));
+
+  if (isHandwritten) {
+    note.note_type = 'handwritten';
+    return (
+      <HandwrittenEditor
+        initialNote={note}
+        userId={user.id}
+        initialSettings={settings || undefined}
+      />
+    );
+  }
 
   return (
     <TiptapEditor

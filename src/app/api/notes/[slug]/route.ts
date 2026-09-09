@@ -131,6 +131,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       updatePayload.content = body.content;
     }
 
+    if (body.note_type === 'handwritten' || body.note_type === 'text') {
+      updatePayload.note_type = body.note_type;
+    }
+
     let { data: updatedNote, error: updateError } = await serverClient
       .from('notes')
       .update(updatePayload)
@@ -139,8 +143,13 @@ export async function PATCH(request: Request, context: RouteContext) {
       .select()
       .maybeSingle();
 
-    if (updateError && updateError.code === '42703') {
-      delete updatePayload.slug;
+    if (
+      updateError &&
+      (updateError.code === 'PGRST204' ||
+        updateError.code === '42703' ||
+        updateError.message?.includes('note_type'))
+    ) {
+      delete updatePayload.note_type;
       const retry = await serverClient
         .from('notes')
         .update(updatePayload)
@@ -160,6 +169,14 @@ export async function PATCH(request: Request, context: RouteContext) {
     const noteWithSlug = {
       ...updatedNote,
       slug: updatedNote.slug || newSlug || titleToSlug(updatedNote.title),
+      note_type:
+        updatedNote.note_type ||
+        body.note_type ||
+        (typeof updatedNote.content === 'string' &&
+        updatedNote.content.trim().startsWith('{') &&
+        updatedNote.content.includes('"pages"')
+          ? 'handwritten'
+          : 'text'),
     };
 
     return NextResponse.json({ note: noteWithSlug });

@@ -66,6 +66,7 @@ import {
   Search,
   Trash2,
   HelpCircle,
+  PenTool,
   Maximize2,
   Minimize2,
   Undo2,
@@ -287,6 +288,8 @@ export function TiptapEditor({ initialNote, userId, initialSettings }: TiptapEdi
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isConvertModeOpen, setIsConvertModeOpen] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
 
   // Link Dialog State
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
@@ -723,6 +726,59 @@ ${html}
     }
   };
 
+  const handleConvertToHandwritten = async () => {
+    try {
+      setIsConverting(true);
+      const targetIdentifier = currentSlugRef.current || initialNote.slug || initialNote.id;
+      const rawText = editor ? editor.getText().trim() : '';
+      const initialHandwritten = {
+        version: 1,
+        pages: [
+          {
+            id: 'page-1',
+            template: 'ruled',
+            paperColor: '#ffffff',
+            strokes: [],
+            shapes: [],
+            textBoxes: rawText
+              ? [
+                  {
+                    id: 'tb-1',
+                    x: 80,
+                    y: 100,
+                    width: 840,
+                    text: rawText,
+                    fontSize: 18,
+                    color: '#1e293b',
+                  },
+                ]
+              : [],
+            images: [],
+          },
+        ],
+        currentPageIndex: 0,
+      };
+
+      const res = await fetch(`/api/notes/${encodeURIComponent(targetIdentifier)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          note_type: 'handwritten',
+          content: JSON.stringify(initialHandwritten),
+        }),
+      });
+
+      if (res.ok) {
+        setIsConvertModeOpen(false);
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('Failed to convert note mode:', err);
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
   if (!editor) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#f3f4f7] dark:bg-[#090d16]">
@@ -818,8 +874,15 @@ ${html}
                 </Button>
               }
               align="end"
-              className="w-48 text-xs"
+              className="w-56 text-xs"
             >
+              <DropdownMenuItem
+                onSelect={() => setIsConvertModeOpen(true)}
+                className="gap-2 cursor-pointer py-1.5"
+              >
+                <PenTool className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Switch to Handwritten Mode</span>
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => setIsShortcutsOpen(true)}
                 className="gap-2 cursor-pointer py-1.5"
@@ -1815,6 +1878,48 @@ ${html}
                 disabled={isDeleting}
               >
                 {isDeleting ? 'Deleting…' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {/* Switch to Handwritten Mode Confirmation Dialog */}
+        <Dialog open={isConvertModeOpen} onOpenChange={setIsConvertModeOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-base font-medium flex items-center gap-2">
+                <PenTool className="h-4 w-4 text-emerald-500" />
+                Switch to Handwritten Note Mode
+              </DialogTitle>
+              <DialogDescription className="text-xs text-zinc-500 pt-1 leading-relaxed">
+                This note will be converted to an iPad-optimized handwritten notebook canvas with Apple Pencil and stylus support.
+                <br /><br />
+                Your current text will be preserved as a text box on the first page.
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="gap-2 sm:gap-0 mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsConvertModeOpen(false)}
+                disabled={isConverting}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={handleConvertToHandwritten}
+                disabled={isConverting}
+              >
+                {isConverting ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Converting…
+                  </>
+                ) : (
+                  'Convert to Handwritten'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

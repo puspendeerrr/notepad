@@ -33,7 +33,10 @@ import {
   Loader2,
   ArrowUpDown,
   FilePlus,
+  PenTool,
 } from 'lucide-react';
+import { CreateNoteModal } from '@/components/notes/create-note-modal';
+import { NoteType } from '@/types';
 
 type SortOption = 'updated' | 'created' | 'title';
 
@@ -45,6 +48,7 @@ export default function NotesPage() {
   const [username, setUsername] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,7 +97,7 @@ export default function NotesPage() {
   }, [setTheme]);
 
   // Handler: Create New Note
-  const handleCreateNote = async () => {
+  const handleCreateNote = async (type: NoteType = 'text') => {
     if (creating) return;
     setCreating(true);
 
@@ -103,6 +107,7 @@ export default function NotesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: 'Untitled Note',
+          note_type: type,
           content: '',
         }),
       });
@@ -124,7 +129,7 @@ export default function NotesPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('action') === 'new') {
-        handleCreateNote();
+        setCreateModalOpen(true);
       }
     }
   }, []);
@@ -289,10 +294,10 @@ export default function NotesPage() {
 
             {/* + New Note Button */}
             <Button
-              onClick={handleCreateNote}
+              onClick={() => setCreateModalOpen(true)}
               disabled={creating}
               size="sm"
-              className="h-8 gap-1.5 text-xs font-medium"
+              className="h-8 gap-1.5 text-xs font-medium cursor-pointer"
             >
               {creating ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -326,10 +331,10 @@ export default function NotesPage() {
             </p>
             {!searchQuery && (
               <Button
-                onClick={handleCreateNote}
+                onClick={() => setCreateModalOpen(true)}
                 disabled={creating}
                 size="sm"
-                className="mt-4 text-xs gap-1.5"
+                className="mt-4 text-xs gap-1.5 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>Create your first note</span>
@@ -398,16 +403,23 @@ export default function NotesPage() {
                       </DropdownMenu>
                     </div>
 
-                    {/* Two-line Content Preview */}
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 line-clamp-2 leading-relaxed min-h-[2.25rem]">
-                      {preview}
-                    </p>
+                    {/* Content Preview */}
+                    {note.note_type === 'handwritten' ? (
+                      <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium min-h-[2.25rem]">
+                        <PenTool className="h-3.5 w-3.5" />
+                        <span>Handwritten Notebook</span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 line-clamp-2 leading-relaxed min-h-[2.25rem]">
+                        {preview}
+                      </p>
+                    )}
                   </div>
 
                   {/* Card Bottom: Metadata */}
                   <div className="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 pt-3 mt-2 border-t border-zinc-100 dark:border-zinc-800/60">
                     <span>{formatDate(note.updated_at)}</span>
-                    <span>{words} {words === 1 ? 'word' : 'words'}</span>
+                    <span>{note.note_type === 'handwritten' ? 'Notebook' : `${words} ${words === 1 ? 'word' : 'words'}`}</span>
                   </div>
                 </div>
               );
@@ -495,6 +507,17 @@ export default function NotesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Create Note Choice Modal */}
+      <CreateNoteModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onSelectType={(type) => {
+          setCreateModalOpen(false);
+          handleCreateNote(type);
+        }}
+        loading={creating}
+      />
     </div>
   );
 }

@@ -50,6 +50,7 @@ create table if not exists public.notes (
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null default 'Untitled Note',
   slug text not null default 'untitled-note',
+  note_type text not null default 'text' check (note_type in ('text', 'handwritten')),
   content text not null default '',
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now()),
