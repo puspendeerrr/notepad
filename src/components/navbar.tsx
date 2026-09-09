@@ -41,25 +41,25 @@ export function Navbar({ username, children }: NavbarProps) {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-zinc-200 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-sm transition-colors">
-      <div className="flex h-12 w-full items-center justify-between px-4 sm:px-6 md:px-8">
+      <div className="flex h-12 w-full items-center justify-between px-3 sm:px-6 md:px-8 gap-2">
         {/* Left: Text Logo */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/notes"
             className="flex items-center gap-2 group transition-opacity hover:opacity-85"
           >
             <FileText className="h-4 w-4 text-zinc-900 dark:text-zinc-100" />
-            <span className="font-semibold text-sm tracking-tight text-zinc-900 dark:text-zinc-100">
+            <span className="font-semibold text-sm tracking-tight text-zinc-900 dark:text-zinc-100 hidden xs:inline">
               Notepad
             </span>
           </Link>
         </div>
 
         {/* Center: Search or custom toolbar elements */}
-        {children && <div className="flex-1 max-w-xl mx-4 sm:mx-8">{children}</div>}
+        {children && <div className="flex-1 min-w-0 max-w-xl mx-1 sm:mx-6">{children}</div>}
 
         {/* Right: Theme Toggle & Profile Dropdown */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Visible Light / Dark / System Theme Toggle */}
           <ThemeToggle />
 

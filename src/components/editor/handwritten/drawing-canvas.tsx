@@ -361,7 +361,7 @@ export function DrawingCanvas({
     ctx.restore();
   }, [page, pan, zoom, selectedItemIds]);
 
-  // Sync canvas dimensions to fill 100% of viewport
+  // Sync canvas dimensions to fill 100% of viewport and handle orientation changes
   useEffect(() => {
     const handleResize = () => {
       const canvas = canvasRef.current;
@@ -373,9 +373,11 @@ export function DrawingCanvas({
       const h = container.clientHeight;
 
       if (w > 0 && h > 0) {
-        if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
-          canvas.width = w * dpr;
-          canvas.height = h * dpr;
+        const targetW = Math.round(w * dpr);
+        const targetH = Math.round(h * dpr);
+        if (canvas.width !== targetW || canvas.height !== targetH) {
+          canvas.width = targetW;
+          canvas.height = targetH;
         }
       }
       redrawCanvas();
@@ -383,7 +385,19 @@ export function DrawingCanvas({
 
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      ro = new ResizeObserver(() => handleResize());
+      ro.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      if (ro) ro.disconnect();
+    };
   }, [redrawCanvas]);
 
   // Trigger redraw on state change

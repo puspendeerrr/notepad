@@ -44,6 +44,7 @@ html,
 body {
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
@@ -52,6 +53,20 @@ body {
   font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Safe area insets for notched devices and home indicators */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 /* Custom minimal scrollbars */
@@ -104,12 +119,12 @@ body {
   transition: none !important;
 }
 
-/* Generous inner padding so typing feels spacious */
+/* Responsive inner padding so typing feels spacious across all screens */
 .cm-content {
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
-  padding: 40px 56px 200px 56px !important;
+  padding: 36px 48px 200px 48px !important;
   caret-color: currentColor;
   min-height: 100%;
   line-height: 1.7 !important;
@@ -119,9 +134,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+@media (max-width: 1024px) {
+  .cm-content {
+    padding: 28px 24px 180px 24px !important;
+  }
+}
+
 @media (max-width: 640px) {
   .cm-content {
-    padding: 24px 20px 160px 20px !important;
+    padding: 20px 16px 140px 16px !important;
   }
 }
 
@@ -327,7 +348,7 @@ body {
 .ProseMirror {
   outline: none !important;
   min-height: 100%;
-  padding: 40px 56px 200px 56px;
+  padding: 36px 48px 200px 48px;
   line-height: 1.5;
   letter-spacing: 0.012em;
   font-family: inherit;
@@ -337,9 +358,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+@media (max-width: 1024px) {
+  .ProseMirror {
+    padding: 28px 24px 180px 24px;
+  }
+}
+
 @media (max-width: 640px) {
   .ProseMirror {
-    padding: 24px 20px 160px 20px;
+    padding: 20px 16px 140px 16px;
   }
 }
 
@@ -552,15 +579,30 @@ body {
   user-select: none;
 }
 
-/* Tables */
+/* Tables with responsive horizontal container scrolling */
+.ProseMirror .tableWrapper {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 1rem 0;
+  -webkit-overflow-scrolling: touch;
+}
+
 .ProseMirror table {
   border-collapse: collapse;
   width: 100%;
-  margin: 1rem 0;
+  margin: 0;
   table-layout: fixed;
-  overflow: hidden;
   border-radius: 0.375rem;
   border: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+  .ProseMirror table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 .ProseMirror th,

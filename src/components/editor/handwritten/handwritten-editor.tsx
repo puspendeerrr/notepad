@@ -558,16 +558,16 @@ export function HandwrittenEditor({
     <div className="relative h-screen w-screen overflow-hidden bg-zinc-100 dark:bg-[#0b0c0e] text-zinc-900 dark:text-zinc-100 select-none">
       {/* Top Floating Header Overlay */}
       {!isFocusMode && (
-        <header className="absolute top-3 inset-x-3 sm:inset-x-6 z-30 flex items-center justify-between pointer-events-none transition-all duration-300">
+        <header className="absolute top-2.5 sm:top-3 inset-x-2 sm:inset-x-6 z-30 flex items-center justify-between gap-1.5 sm:gap-3 pointer-events-none transition-all duration-300 pt-[env(safe-area-inset-top,0px)]">
           {/* Left: Back + Title */}
-          <div className="flex items-center gap-2 pointer-events-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-md min-w-0">
-            <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
+          <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md px-2.5 sm:px-3 py-1.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-md min-w-0 shrink">
+            <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 shrink-0">
               <Link href="/notes" title="All Notes">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
 
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
               <input
                 type="text"
                 value={noteTitle}
@@ -576,10 +576,10 @@ export function HandwrittenEditor({
                   setSaveStatus('saving');
                 }}
                 placeholder="Untitled Note"
-                className="bg-transparent border-0 font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 rounded px-1.5 py-0.5 truncate max-w-[140px] sm:max-w-xs"
+                className="bg-transparent border-0 font-medium text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 rounded px-1.5 py-0.5 truncate max-w-[85px] xs:max-w-[130px] sm:max-w-xs"
               />
 
-              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60">
+              <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60">
                 <Sparkles className="h-2.5 w-2.5 text-emerald-500" />
                 Handwritten
               </span>
@@ -587,7 +587,7 @@ export function HandwrittenEditor({
           </div>
 
           {/* Center: Multi-Page / Board Navigation */}
-          <div className="pointer-events-auto">
+          <div className="pointer-events-auto shrink-0">
             <PagesPanel
               pages={pages}
               currentPageIndex={currentPageIndex}
@@ -601,53 +601,21 @@ export function HandwrittenEditor({
             />
           </div>
 
-          {/* Right Controls: Save Status, Zoom/Reset, Mode, Export, Theme */}
-          <div className="flex items-center gap-2 pointer-events-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-md">
-            {/* Zoom Controls with Reset View */}
-            <div className="hidden md:flex items-center gap-1 px-1.5 py-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs">
-              <button
-                type="button"
-                onClick={() => setZoom((z) => Math.max(0.15, Number((z - 0.15).toFixed(2))))}
-                className="p-1 hover:text-zinc-900 dark:hover:text-zinc-100"
-                title="Zoom Out"
-              >
-                <ZoomOut className="h-3.5 w-3.5" />
-              </button>
-              <span className="w-11 text-center text-[11px] font-mono text-zinc-600 dark:text-zinc-400">
-                {Math.round(zoom * 100)}%
-              </span>
-              <button
-                type="button"
-                onClick={() => setZoom((z) => Math.min(4.0, Number((z + 0.15).toFixed(2))))}
-                className="p-1 hover:text-zinc-900 dark:hover:text-zinc-100"
-                title="Zoom In"
-              >
-                <ZoomIn className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={handleResetView}
-                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border-l border-zinc-200 dark:border-zinc-800 ml-1 pl-1.5 flex items-center gap-1"
-                title="Reset View (100%)"
-              >
-                <RotateCcw className="h-3 w-3" />
-                <span className="hidden lg:inline text-[10px]">Reset</span>
-              </button>
-            </div>
-
+          {/* Right Controls: Save Status, Mode, Export, Theme */}
+          <div className="flex items-center gap-1 sm:gap-1.5 pointer-events-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md px-2 sm:px-3 py-1.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-md shrink-0">
             {/* Save Status Badge */}
-            <div className="hidden lg:flex items-center gap-1 text-[11px] text-zinc-400 dark:text-zinc-500 font-medium px-2 py-1">
+            <div className="flex items-center gap-1 text-[11px] text-zinc-400 dark:text-zinc-500 font-medium px-1 sm:px-2 py-0.5">
               {saveStatus === 'saving' ? (
                 <>
                   <Loader2 className="h-3 w-3 animate-spin text-zinc-500" />
-                  <span>Saving…</span>
+                  <span className="hidden sm:inline">Saving…</span>
                 </>
               ) : saveStatus === 'offline' ? (
-                <span className="text-amber-500">Offline (Cached)</span>
+                <span className="text-amber-500 text-[10px] sm:text-xs">Offline</span>
               ) : (
                 <>
                   <Check className="h-3 w-3 text-emerald-500" />
-                  <span>Saved</span>
+                  <span className="hidden sm:inline">Saved</span>
                 </>
               )}
             </div>
@@ -669,7 +637,7 @@ export function HandwrittenEditor({
               variant="ghost"
               size="icon"
               onClick={() => setIsFocusMode(!isFocusMode)}
-              className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+              className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hidden sm:inline-flex"
               title="Fullscreen Mode"
             >
               {isFocusMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -686,6 +654,40 @@ export function HandwrittenEditor({
             <ThemeToggle />
           </div>
         </header>
+      )}
+
+      {/* Floating Zoom & Pan Controls Overlay */}
+      {!isFocusMode && (
+        <div className="fixed bottom-3 right-3 sm:bottom-4 sm:right-6 z-30 hidden sm:flex items-center gap-1 px-2 py-1 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-zinc-200/80 dark:border-zinc-800 shadow-lg text-xs select-none pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.max(0.15, Number((z - 0.15).toFixed(2))))}
+            className="p-1 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Zoom Out"
+          >
+            <ZoomOut className="h-3.5 w-3.5" />
+          </button>
+          <span className="w-11 text-center text-[11px] font-mono text-zinc-600 dark:text-zinc-400">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.min(4.0, Number((z + 0.15).toFixed(2))))}
+            className="p-1 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Zoom In"
+          >
+            <ZoomIn className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleResetView}
+            className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border-l border-zinc-200 dark:border-zinc-800 ml-1 pl-1.5 flex items-center gap-1 rounded-r-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Reset View (100%)"
+          >
+            <RotateCcw className="h-3 w-3" />
+            <span className="text-[10px]">Reset</span>
+          </button>
+        </div>
       )}
 
       {/* Full-Viewport Infinite Drawing Canvas */}

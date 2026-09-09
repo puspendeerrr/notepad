@@ -252,25 +252,25 @@ export default function NotesPage() {
       </Navbar>
 
       {/* Main Container - Spans full width without restrictive max-width */}
-      <main className="flex-1 w-full px-4 sm:px-6 md:px-8 lg:px-10 py-6 min-w-0">
+      <main className="flex-1 w-full px-3 sm:px-6 md:px-8 lg:px-10 py-4 sm:py-6 min-w-0">
         {/* Top Controls Bar */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-between gap-3 pb-4 sm:pb-6 border-b border-zinc-200 dark:border-zinc-800">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+            <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
               All Notes
             </h1>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              {notes.length} {notes.length === 1 ? 'note' : 'notes'} stored securely
+              {notes.length} {notes.length === 1 ? 'note' : 'notes'}
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             {/* Sorting Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 px-2 sm:px-3 text-xs">
                   <ArrowUpDown className="h-3 w-3" />
-                  <span>
+                  <span className="hidden xs:inline">
                     {sortBy === 'updated'
                       ? 'Last edited'
                       : sortBy === 'created'
@@ -297,7 +297,7 @@ export default function NotesPage() {
               onClick={() => setCreateModalOpen(true)}
               disabled={creating}
               size="sm"
-              className="h-8 gap-1.5 text-xs font-medium cursor-pointer"
+              className="h-8 gap-1.5 px-2.5 sm:px-3 text-xs font-medium cursor-pointer"
             >
               {creating ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -343,7 +343,7 @@ export default function NotesPage() {
           </div>
         ) : (
           /* Notes Grid / List - Fully responsive multi-column layout */
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 pt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 pt-4 sm:pt-6">
             {filteredNotes.map((note) => {
               const preview = note.content ? note.content.trim() : 'Empty note';
               const words = countWords(note.content);

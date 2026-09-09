@@ -137,7 +137,7 @@ function ToolbarButton({
           type="button"
           onClick={onClick}
           className={cn(
-            'inline-flex h-7 w-7 items-center justify-center rounded text-xs transition-colors shrink-0',
+            'inline-flex h-8 w-8 sm:h-7 sm:w-7 items-center justify-center rounded text-xs transition-colors shrink-0 touch-manipulation',
             isActive
               ? 'bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 font-medium shadow-xs'
               : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100',
@@ -800,17 +800,17 @@ ${html}
             ========================================================================= */}
         <header
           className={cn(
-            'flex h-11 w-full items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/60 bg-white/95 dark:bg-[#111215]/95 px-3 sm:px-4 backdrop-blur-md shrink-0 z-30 transition-all duration-300 no-print',
+            'flex h-11 w-full items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/60 bg-white/95 dark:bg-[#111215]/95 px-2.5 sm:px-4 backdrop-blur-md shrink-0 z-30 transition-all duration-300 no-print',
             isFocusMode && 'opacity-25 hover:opacity-95'
           )}
         >
-          <div className="flex items-center gap-2 flex-1 min-w-0 mr-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 mr-2 sm:mr-4">
             <ToolbarTooltipTrigger title="Back to Notes" side="bottom">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleBack}
-                className="h-8 w-8 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 shrink-0"
+                className="h-8 w-8 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 shrink-0 touch-manipulation"
                 aria-label="Back to Notes"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -823,34 +823,34 @@ ${html}
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
               placeholder="Untitled Note"
-              className="w-full bg-transparent font-medium text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none px-2 py-0.5 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 focus:bg-zinc-200/80 dark:focus:bg-zinc-800/80 transition-colors"
+              className="w-full min-w-0 bg-transparent font-medium text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none px-1.5 sm:px-2 py-0.5 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 focus:bg-zinc-200/80 dark:focus:bg-zinc-800/80 transition-colors truncate"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {/* Save Status Indicator */}
             <ToolbarTooltipTrigger title="Save Note" shortcut="Ctrl+S" side="bottom">
               <div
-                className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500 mr-2 select-none cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+                className="flex items-center gap-1 sm:gap-1.5 text-xs text-zinc-400 dark:text-zinc-500 mr-1 sm:mr-2 select-none cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
                 onClick={saveImmediately}
                 aria-label="Save note"
               >
                 {saveStatus === 'saving' && (
                   <>
                     <Loader2 className="h-3 w-3 animate-spin text-zinc-400" />
-                    <span className="text-[11px]">Saving…</span>
+                    <span className="text-[11px] hidden sm:inline">Saving…</span>
                   </>
                 )}
                 {saveStatus === 'saved' && (
                   <>
                     <Check className="h-3 w-3 text-zinc-400 dark:text-zinc-500" />
-                    <span className="text-[11px]">Saved</span>
+                    <span className="text-[11px] hidden sm:inline">Saved</span>
                   </>
                 )}
                 {saveStatus === 'offline' && (
                   <>
                     <WifiOff className="h-3 w-3 text-amber-500" />
-                    <span className="text-[11px] text-amber-600 dark:text-amber-500">Offline</span>
+                    <span className="text-[11px] text-amber-600 dark:text-amber-500 hidden sm:inline">Offline</span>
                   </>
                 )}
               </div>
@@ -909,7 +909,7 @@ ${html}
         <nav
           aria-label="Formatting toolbar"
           className={cn(
-            'flex h-10 w-full items-center border-b border-zinc-200/70 dark:border-zinc-800/50 bg-white/80 dark:bg-[#111215]/80 backdrop-blur-md px-3 overflow-x-auto scrollbar-none shrink-0 z-20 transition-all duration-300 select-none no-print gap-0.5 opacity-90 hover:opacity-100',
+            'flex h-10 sm:h-10 w-full items-center border-b border-zinc-200/70 dark:border-zinc-800/50 bg-white/80 dark:bg-[#111215]/80 backdrop-blur-md px-2 sm:px-3 overflow-x-auto scrollbar-none shrink-0 z-20 transition-all duration-300 select-none no-print gap-0.5 opacity-90 hover:opacity-100 touch-pan-x',
             isFocusMode && 'opacity-20 hover:opacity-95'
           )}
         >
@@ -1574,9 +1574,9 @@ ${html}
 
         {/* Find and Replace Floating Panel */}
         {isFindOpen && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 px-4 py-2 z-20 shadow-sm transition-all text-xs no-print">
-            <div className="flex items-center gap-1.5">
-              <Search className="h-3.5 w-3.5 text-zinc-400" />
+          <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 px-3 sm:px-4 py-2 z-20 shadow-sm transition-all text-xs no-print">
+            <div className="flex items-center gap-1.5 flex-1 min-w-[140px]">
+              <Search className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
               <Input
                 placeholder="Find…"
                 value={findText}
@@ -1584,17 +1584,17 @@ ${html}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleFindNext();
                 }}
-                className="h-7 w-36 sm:w-48 text-xs"
+                className="h-7 w-full text-xs"
                 autoFocus
               />
             </div>
-            <div className="flex items-center gap-1.5">
-              <Replace className="h-3.5 w-3.5 text-zinc-400" />
+            <div className="flex items-center gap-1.5 flex-1 min-w-[140px]">
+              <Replace className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
               <Input
                 placeholder="Replace with…"
                 value={replaceText}
                 onChange={(e) => setReplaceText(e.target.value)}
-                className="h-7 w-36 sm:w-48 text-xs"
+                className="h-7 w-full text-xs"
               />
             </div>
 
@@ -1675,10 +1675,10 @@ ${html}
             aria-hidden="true"
           />
 
-          {/* Full-width and full-height scrollable editor with spacious internal padding */}
+          {/* Full-width and full-height scrollable editor without restrictive max-width box */}
           <div className="tiptap-wrapper relative z-10 h-full w-full overflow-y-auto">
             <div
-              className="w-full max-w-4xl mx-auto min-h-full transition-[font-size] duration-150"
+              className="w-full min-h-full transition-[font-size] duration-150"
               style={{
                 fontSize: fontSize,
                 fontFamily:
@@ -1699,23 +1699,23 @@ ${html}
             ========================================================================= */}
         <footer
           className={cn(
-            'flex h-7 w-full items-center justify-between border-t border-zinc-200/80 dark:border-zinc-800/60 bg-white/95 dark:bg-[#111215]/95 backdrop-blur-md px-4 sm:px-6 text-[11px] text-zinc-400 dark:text-zinc-500 select-none shrink-0 no-print transition-all duration-300',
+            'flex h-7 w-full items-center justify-between border-t border-zinc-200/80 dark:border-zinc-800/60 bg-white/95 dark:bg-[#111215]/95 backdrop-blur-md px-3 sm:px-6 text-[11px] text-zinc-400 dark:text-zinc-500 select-none shrink-0 no-print transition-all duration-300',
             isFocusMode && 'opacity-20 hover:opacity-95'
           )}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 truncate">
             <span>{stats.wordCount} words</span>
-            <span>·</span>
-            <span>{stats.charCount} characters</span>
-            <span>·</span>
-            <span className="flex items-center gap-1">
+            <span className="hidden xs:inline">·</span>
+            <span className="hidden xs:inline">{stats.charCount} characters</span>
+            <span className="hidden sm:inline">·</span>
+            <span className="hidden sm:flex items-center gap-1">
               <Clock className="h-3 w-3" />
               <span>{stats.readingTime} min read</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-3 font-mono">
-            <span>
+          <div className="flex items-center gap-2 sm:gap-3 font-mono shrink-0">
+            <span className="hidden md:inline">
               {editor.isActive('heading', { level: 1 })
                 ? 'Heading 1'
                 : editor.isActive('heading', { level: 2 })
@@ -1732,7 +1732,7 @@ ${html}
                 ? 'Task List'
                 : 'Paragraph'}
             </span>
-            <span>·</span>
+            <span className="hidden md:inline">·</span>
             <span className="capitalize">{saveStatus}</span>
           </div>
         </footer>

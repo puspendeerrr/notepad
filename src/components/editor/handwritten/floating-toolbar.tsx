@@ -104,7 +104,21 @@ export function FloatingToolbar({
   onToggleFingerDrawing,
 }: FloatingToolbarProps) {
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [isMobileToolbar, setIsMobileToolbar] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileToolbar(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    window.addEventListener('orientationchange', checkMobile);
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('orientationchange', checkMobile);
+    };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,13 +140,19 @@ export function FloatingToolbar({
         onChange={handleFileChange}
       />
 
-      <div className="fixed left-3 top-20 sm:left-6 z-40 flex flex-col items-center gap-1.5 p-2 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-zinc-200/80 dark:border-zinc-800 shadow-xl transition-all select-none">
+      <div
+        className={`fixed z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-zinc-200/80 dark:border-zinc-800 shadow-xl transition-all select-none ${
+          isMobileToolbar
+            ? 'bottom-2.5 inset-x-2 max-w-fit mx-auto flex flex-row items-center gap-1 p-1.5 rounded-2xl overflow-x-auto scrollbar-none pb-[max(0.375rem,env(safe-area-inset-bottom,0px))]'
+            : 'left-3 top-20 sm:left-6 flex flex-col items-center gap-1.5 p-2 rounded-2xl'
+        }`}
+      >
         {/* Pen Tool */}
         <button
           type="button"
           title="Pen (Solid handwriting)"
           onClick={() => onSelectTool('pen')}
-          className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all ${
+          className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all shrink-0 touch-manipulation ${
             currentTool === 'pen'
               ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
               : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -176,7 +196,7 @@ export function FloatingToolbar({
               type="button"
               title={`Eraser (${eraserMode === 'stroke' ? 'Stroke' : 'Partial'})`}
               onClick={() => onSelectTool('eraser')}
-              className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all relative ${
+              className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all relative shrink-0 touch-manipulation ${
                 currentTool === 'eraser'
                   ? 'bg-rose-500 text-white shadow-sm'
                   : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -185,7 +205,12 @@ export function FloatingToolbar({
               <Eraser className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="w-44 text-xs">
+          <DropdownMenuContent
+            side={isMobileToolbar ? 'top' : 'right'}
+            sideOffset={isMobileToolbar ? 12 : 8}
+            align={isMobileToolbar ? 'center' : 'start'}
+            className="w-44 text-xs"
+          >
             <DropdownMenuLabel>Eraser Mode</DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => {
@@ -231,7 +256,7 @@ export function FloatingToolbar({
               type="button"
               title="Geometric Shapes"
               onClick={() => onSelectTool('shape')}
-              className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all ${
+              className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all shrink-0 touch-manipulation ${
                 currentTool === 'shape'
                   ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
                   : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -243,7 +268,12 @@ export function FloatingToolbar({
               {currentShape === 'arrow' && <MoveRight className="h-4 w-4" />}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="w-36 text-xs">
+          <DropdownMenuContent
+            side={isMobileToolbar ? 'top' : 'right'}
+            sideOffset={isMobileToolbar ? 12 : 8}
+            align={isMobileToolbar ? 'center' : 'start'}
+            className="w-36 text-xs"
+          >
             <DropdownMenuLabel>Shapes</DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => {
@@ -322,7 +352,7 @@ export function FloatingToolbar({
           <Hand className="h-4 w-4" />
         </button>
 
-        <div className="h-px w-6 bg-zinc-200 dark:bg-zinc-800 my-1" />
+        <div className={isMobileToolbar ? 'h-6 w-px bg-zinc-200 dark:bg-zinc-800 mx-0.5 shrink-0' : 'h-px w-6 bg-zinc-200 dark:bg-zinc-800 my-1'} />
 
         {/* Color Palette Dropdown */}
         <DropdownMenu>
@@ -330,7 +360,7 @@ export function FloatingToolbar({
             <button
               type="button"
               title="Color Picker"
-              className="h-9 w-9 rounded-xl flex items-center justify-center relative hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
+              className="h-9 w-9 rounded-xl flex items-center justify-center relative hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all shrink-0 touch-manipulation"
             >
               <div
                 className="h-5 w-5 rounded-full border-2 border-white dark:border-zinc-800 shadow-sm"
@@ -338,7 +368,12 @@ export function FloatingToolbar({
               />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="p-3 w-52 text-xs">
+          <DropdownMenuContent
+            side={isMobileToolbar ? 'top' : 'right'}
+            sideOffset={isMobileToolbar ? 12 : 8}
+            align={isMobileToolbar ? 'center' : 'start'}
+            className="p-3 w-52 text-xs"
+          >
             <DropdownMenuLabel className="px-1 text-[11px] font-medium text-zinc-400">
               Preset Colors
             </DropdownMenuLabel>
@@ -399,7 +434,7 @@ export function FloatingToolbar({
             <button
               type="button"
               title="Stroke Width"
-              className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-all"
+              className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-all shrink-0 touch-manipulation"
             >
               <div
                 className="rounded-full bg-current"
@@ -407,7 +442,12 @@ export function FloatingToolbar({
               />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="w-40 text-xs">
+          <DropdownMenuContent
+            side={isMobileToolbar ? 'top' : 'right'}
+            sideOffset={isMobileToolbar ? 12 : 8}
+            align={isMobileToolbar ? 'center' : 'start'}
+            className="w-40 text-xs"
+          >
             <DropdownMenuLabel>Stroke Size</DropdownMenuLabel>
             {STROKE_WIDTHS.map((sw) => (
               <DropdownMenuItem
@@ -425,7 +465,7 @@ export function FloatingToolbar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="h-px w-6 bg-zinc-200 dark:bg-zinc-800 my-1" />
+        <div className={isMobileToolbar ? 'h-6 w-px bg-zinc-200 dark:bg-zinc-800 mx-0.5 shrink-0' : 'h-px w-6 bg-zinc-200 dark:bg-zinc-800 my-1'} />
 
         {/* Undo */}
         <button
@@ -454,19 +494,19 @@ export function FloatingToolbar({
           type="button"
           title="Clear Current Page"
           onClick={() => setClearDialogOpen(true)}
-          className="h-9 w-9 rounded-xl flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all"
+          className="h-9 w-9 rounded-xl flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all shrink-0 touch-manipulation"
         >
           <Trash2 className="h-4 w-4" />
         </button>
 
-        <div className="h-px w-6 bg-zinc-200 dark:bg-zinc-800 my-1" />
+        <div className={isMobileToolbar ? 'h-6 w-px bg-zinc-200 dark:bg-zinc-800 mx-0.5 shrink-0' : 'h-px w-6 bg-zinc-200 dark:bg-zinc-800 my-1'} />
 
         {/* Toggle Finger Drawing (Setting: allow finger drawing on/off) */}
         <button
           type="button"
           title={allowFingerDrawing ? 'Finger Drawing: Enabled (Tap for Pencil Only)' : 'Finger Drawing: Pencil Only (Tap to enable finger)'}
           onClick={() => onToggleFingerDrawing(!allowFingerDrawing)}
-          className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all ${
+          className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all shrink-0 touch-manipulation ${
             allowFingerDrawing
               ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'
               : 'text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'

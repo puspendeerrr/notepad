@@ -98,9 +98,12 @@ export function PagesPanel({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="px-2 h-7 rounded-lg flex items-center gap-1.5 text-zinc-700 dark:text-zinc-200 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="px-1.5 sm:px-2 h-7 rounded-lg flex items-center gap-1 sm:gap-1.5 text-zinc-700 dark:text-zinc-200 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             >
-              <span>Page {currentPageIndex + 1} of {pages.length}</span>
+              <span>
+                <span className="hidden sm:inline">Page </span>
+                {currentPageIndex + 1}/{pages.length}
+              </span>
               <Layers className="h-3 w-3 text-zinc-400" />
             </button>
           </DropdownMenuTrigger>

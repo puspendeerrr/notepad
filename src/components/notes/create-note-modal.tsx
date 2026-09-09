@@ -27,8 +27,8 @@ export function CreateNoteModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-2xl">
-        <DialogHeader className="p-6 pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
-          <DialogTitle className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+        <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
+          <DialogTitle className="text-base sm:text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
             Create New Note
           </DialogTitle>
           <DialogDescription className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
@@ -36,7 +36,7 @@ export function CreateNoteModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {/* Option 1: Text Note */}
           <button
             type="button"
