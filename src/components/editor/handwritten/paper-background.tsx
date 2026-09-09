@@ -26,17 +26,29 @@ export function PaperBackground({
   paperColor,
   isDark = false,
 }: PaperBackgroundProps) {
-  // Determine pattern line / dot color based on paper darkness
+  // If in dark mode and paper is white/light, automatically use dark paper color (#121215)
+  const isLightColor =
+    !paperColor ||
+    paperColor === '#ffffff' ||
+    paperColor === '#faf8f2' ||
+    paperColor === '#fdfbe8' ||
+    paperColor === '#f1f5f9';
+
+  const effectiveBgColor = isDark
+    ? isLightColor
+      ? '#121215'
+      : paperColor
+    : paperColor || '#ffffff';
+
   const isDarkPaper =
-    paperColor === '#09090b' ||
-    paperColor === '#18181b' ||
-    paperColor === '#1c1b18' ||
-    paperColor === '#242316' ||
-    paperColor === '#0f172a' ||
+    effectiveBgColor === '#09090b' ||
+    effectiveBgColor === '#121215' ||
+    effectiveBgColor === '#18181b' ||
+    effectiveBgColor === '#1c1b18' ||
     isDark;
 
   const lineColor = isDarkPaper ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.07)';
-  const marginColor = isDarkPaper ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.2)';
+  const marginColor = isDarkPaper ? 'rgba(239, 68, 68, 0.35)' : 'rgba(239, 68, 68, 0.2)';
   const dotColor = isDarkPaper ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.18)';
 
   return (
@@ -45,7 +57,7 @@ export function PaperBackground({
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       className="absolute inset-0 pointer-events-none select-none"
-      style={{ backgroundColor: paperColor }}
+      style={{ backgroundColor: effectiveBgColor }}
     >
       <defs>
         {/* Ruled Pattern */}

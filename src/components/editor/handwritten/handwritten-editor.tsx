@@ -52,14 +52,14 @@ interface HandwrittenEditorProps {
 }
 
 // Initial blank notebook structure
-function createInitialNotebook(): HandwrittenNoteData {
+function createInitialNotebook(isDark = false): HandwrittenNoteData {
   return {
     version: 1,
     pages: [
       {
         id: 'page-1',
         template: 'ruled',
-        paperColor: '#ffffff',
+        paperColor: isDark ? '#121214' : '#ffffff',
         strokes: [],
         shapes: [],
         textBoxes: [],
@@ -129,14 +129,14 @@ export function HandwrittenEditor({
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<string>(initialNote.content || '');
 
-  // Keep dark mode default color in sync if untouched
+  // Set default color once on mount based on theme
+  const hasInitializedThemeRef = useRef(false);
   useEffect(() => {
-    if (currentColor === '#ffffff' && !isDark) {
-      setCurrentColor('#09090b');
-    } else if (currentColor === '#09090b' && isDark) {
-      setCurrentColor('#ffffff');
+    if (!hasInitializedThemeRef.current && resolvedTheme) {
+      hasInitializedThemeRef.current = true;
+      setCurrentColor(resolvedTheme === 'dark' ? '#ffffff' : '#09090b');
     }
-  }, [isDark, currentColor]);
+  }, [resolvedTheme]);
 
   // Push new state to History Stack
   const recordHistory = useCallback((newPages: NotebookPage[]) => {
@@ -489,10 +489,30 @@ export function HandwrittenEditor({
   };
 
   // Fit to Page zoom calculation
-  const handleFitToPage = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
+  const handleFitToPage = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const availHeight = window.innerHeight - 68;
+      const availWidth = window.innerWidth - 80;
+      const fitZoom = Math.max(
+        0.35,
+        Math.min(1.0, Math.min(availHeight / VIRTUAL_HEIGHT, availWidth / VIRTUAL_WIDTH))
+      );
+      setZoom(Number(fitZoom.toFixed(2)));
+      setPan({ x: 0, y: 0 });
+    } else {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    }
+  }, []);
+
+  // Fit to page on initial load
+  const hasFittedInitialRef = useRef(false);
+  useEffect(() => {
+    if (!hasFittedInitialRef.current) {
+      hasFittedInitialRef.current = true;
+      handleFitToPage();
+    }
+  }, [handleFitToPage]);
 
   const activePage = pages[currentPageIndex] || pages[0];
 

@@ -69,20 +69,19 @@ export function DrawingCanvas({
   const pinchStartPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Convert client viewport coordinates to canvas virtual coordinates
+  // Convert client viewport coordinates to canvas virtual coordinates (100% exact 1:1 mapping)
   const clientToCanvas = useCallback(
     (clientX: number, clientY: number): { x: number; y: number } => {
-      const container = containerRef.current;
-      if (!container) return { x: 0, y: 0 };
-      const rect = container.getBoundingClientRect();
-      const screenX = clientX - rect.left;
-      const screenY = clientY - rect.top;
+      const canvas = canvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
       return {
-        x: (screenX - pan.x) / zoom,
-        y: (screenY - pan.y) / zoom,
+        x: ((clientX - rect.left) / rect.width) * VIRTUAL_WIDTH,
+        y: ((clientY - rect.top) / rect.height) * VIRTUAL_HEIGHT,
       };
     },
-    [zoom, pan]
+    []
   );
 
   // Full Redraw of Canvas
@@ -96,11 +95,8 @@ export function DrawingCanvas({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    // Device pixel ratio scaling
+    // Device pixel ratio scaling for crisp retina rendering
     ctx.scale(dpr, dpr);
-    // Pan and Zoom transform
-    ctx.translate(pan.x, pan.y);
-    ctx.scale(zoom, zoom);
 
     // 1. Draw Images
     page.images.forEach((imgItem) => {
@@ -324,19 +320,16 @@ export function DrawingCanvas({
     }
 
     ctx.restore();
-  }, [page, pan, zoom, selectedItemIds]);
+  }, [page, selectedItemIds]);
 
   // Sync canvas dimensions with device pixel ratio
   useEffect(() => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!canvas) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = container.clientWidth * dpr;
-    canvas.height = container.clientHeight * dpr;
-    canvas.style.width = `${container.clientWidth}px`;
-    canvas.style.height = `${container.clientHeight}px`;
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    canvas.width = VIRTUAL_WIDTH * dpr;
+    canvas.height = VIRTUAL_HEIGHT * dpr;
 
     redrawCanvas();
   }, [redrawCanvas]);
@@ -683,25 +676,25 @@ export function DrawingCanvas({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden flex items-center justify-center select-none touch-none cursor-crosshair"
+      className="relative w-full h-full overflow-hidden flex items-center justify-center select-none touch-none cursor-crosshair bg-zinc-100 dark:bg-[#0b0c0e]"
       style={{ touchAction: 'none' }}
     >
       {/* Paper Page Surface */}
       <div
-        className="relative shadow-2xl rounded-sm transition-transform"
+        className="relative rounded-lg border border-zinc-200/80 dark:border-zinc-800/80 shadow-2xl transition-transform"
         style={{
-          width: VIRTUAL_WIDTH,
-          height: VIRTUAL_HEIGHT,
+          width: `${VIRTUAL_WIDTH}px`,
+          height: `${VIRTUAL_HEIGHT}px`,
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transformOrigin: '0 0',
+          transformOrigin: 'center center',
         }}
       >
         {/* Notebook Template Background */}
         <PaperBackground
           width={VIRTUAL_WIDTH}
           height={VIRTUAL_HEIGHT}
-          template={page.template || 'ruled'}
-          paperColor={page.paperColor || (isDark ? '#18181b' : '#ffffff')}
+          template={page.template || (isDark ? 'dark' : 'ruled')}
+          paperColor={page.paperColor}
           isDark={isDark}
         />
 
@@ -713,7 +706,11 @@ export function DrawingCanvas({
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           className="absolute inset-0 w-full h-full touch-none"
-          style={{ touchAction: 'none' }}
+          style={{
+            width: `${VIRTUAL_WIDTH}px`,
+            height: `${VIRTUAL_HEIGHT}px`,
+            touchAction: 'none',
+          }}
         />
 
         {/* Text Boxes Overlay */}

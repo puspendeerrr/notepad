@@ -19,6 +19,7 @@ import {
   Redo2,
   Trash2,
   Fingerprint,
+  Check,
 } from 'lucide-react';
 import { DrawingTool, ShapeType, EraserMode } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -61,14 +62,18 @@ interface FloatingToolbarProps {
 }
 
 export const PRESET_COLORS = [
+  '#ffffff', // Clean White
   '#09090b', // Deep Black
-  '#2563eb', // Royal Blue
-  '#dc2626', // Crimson Red
-  '#16a34a', // Emerald Green
-  '#9333ea', // Purple
-  '#d97706', // Amber
-  '#0284c7', // Sky
-  '#ffffff', // White
+  '#ef4444', // Red
+  '#f97316', // Orange
+  '#eab308', // Yellow
+  '#22c55e', // Green
+  '#06b6d4', // Cyan
+  '#3b82f6', // Blue
+  '#a855f7', // Purple
+  '#ec4899', // Pink
+  '#94a3b8', // Gray
+  '#facc15', // Gold
 ];
 
 export const STROKE_WIDTHS = [
@@ -333,31 +338,56 @@ export function FloatingToolbar({
               />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="p-3 w-48 text-xs">
+          <DropdownMenuContent side="right" align="start" className="p-3 w-52 text-xs">
             <DropdownMenuLabel className="px-1 text-[11px] font-medium text-zinc-400">
               Preset Colors
             </DropdownMenuLabel>
-            <div className="grid grid-cols-4 gap-2 my-2">
-              {PRESET_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => onChangeColor(c)}
-                  className={`h-7 w-7 rounded-full border border-zinc-200 dark:border-zinc-700 transition-transform ${
-                    currentColor === c ? 'scale-115 ring-2 ring-zinc-400 dark:ring-zinc-500' : 'hover:scale-105'
-                  }`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
+            <div className="grid grid-cols-4 gap-2.5 my-2">
+              {PRESET_COLORS.map((c) => {
+                const isSelected = currentColor.toLowerCase() === c.toLowerCase();
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onChangeColor(c);
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onChangeColor(c);
+                    }}
+                    title={c}
+                    className={`h-7 w-7 rounded-full border border-zinc-300 dark:border-zinc-700 transition-all flex items-center justify-center cursor-pointer ${
+                      isSelected
+                        ? 'ring-2 ring-emerald-500 ring-offset-2 scale-110'
+                        : 'hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  >
+                    {isSelected && (
+                      <Check
+                        className={`h-3.5 w-3.5 stroke-[2.5] ${
+                          c === '#ffffff' || c === '#eab308' || c === '#facc15'
+                            ? 'text-black'
+                            : 'text-white'
+                        }`}
+                      />
+                    )}
+                  </button>
+                );
+              })}
             </div>
             <DropdownMenuSeparator />
-            <div className="flex items-center gap-2 pt-1 px-1">
-              <span className="text-[11px] text-zinc-500">Custom:</span>
+            <div className="flex items-center justify-between pt-1.5 px-1">
+              <span className="text-[11px] text-zinc-500">Custom Color:</span>
               <input
                 type="color"
                 value={currentColor}
                 onChange={(e) => onChangeColor(e.target.value)}
-                className="h-6 w-8 rounded cursor-pointer border-0 bg-transparent"
+                className="h-7 w-10 rounded cursor-pointer border border-zinc-300 dark:border-zinc-700 bg-transparent p-0.5"
               />
             </div>
           </DropdownMenuContent>
